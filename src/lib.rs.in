@@ -7,7 +7,7 @@ use rustc_plugin::Registry;
 use syntax::codemap::Span;
 use syntax::ptr::P;
 use syntax::parse::token;
-use syntax::ast::TokenTree;
+use syntax::tokenstream::TokenTree;
 use syntax::ext::base::{ ExtCtxt, MacResult, MacEager };
 use syntax::ext::build::AstBuilder;
 use ::parse::*;
