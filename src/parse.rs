@@ -11,12 +11,13 @@ pub fn sanitise(remainder: &[u8], current: &mut String) {
 		//Key
 		b'"'|b'\'' => {
 			let quote_byte = remainder[0];
-			let (rest, key) = take_while1(&remainder[1..], |c| c != quote_byte);
+			let (rest, key) = take_while(&remainder[1..], |c| c != quote_byte);
 
 			current.push('"');
 			current.push_str(key);
 			current.push('"');
 
+			// TODO: Make this work for empty strings
 			sanitise(&rest[1..], current)
 		},
 		//Start of item
@@ -87,6 +88,21 @@ pub fn shift_while<F>(i: &[u8], f: F) -> &[u8] where F: Fn(u8) -> bool {
 	}
 
 	&i[ctr..]
+}
+
+pub fn take_while<F>(i: &[u8], f: F) -> (&[u8], &str) where F: Fn(u8) -> bool {
+	let mut ctr = 0;
+
+	for c in i {
+		if f(*c) {
+			ctr += 1;
+		}
+		else {
+			break;
+		}
+	}
+
+	(&i[ctr..], str::from_utf8(&i[0..ctr]).unwrap())
 }
 
 pub fn take_while1<F>(i: &[u8], f: F) -> (&[u8], &str) where F: Fn(u8) -> bool {

@@ -84,3 +84,13 @@ fn sanitisation_does_not_quote_special_values() {
 
 	assert_eq!("{\"a\":\"stuff\",\"b\":true,\"c\":false,\"d\":null}", &sanitised);
 }
+
+#[test]
+fn sanitisation_works_on_empty_string_values() {
+	let j = "{ \"a\": \"\", \"b\": 1 }";
+
+	let mut sanitised = String::new();
+	sanitise(j.as_bytes(), &mut sanitised);
+
+	assert_eq!("{\"a\":\"\",\"b\":1}", &sanitised);
+}

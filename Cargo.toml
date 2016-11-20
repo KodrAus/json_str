@@ -1,6 +1,6 @@
 [package]
 name = "json_str"
-version = "0.3.2"
+version = "0.3.3"
 authors = ["Ashley Mannix <ashleymannix@live.com.au>"]
 license = "Apache-2.0"
 description = "Write json literals without ugly strings."
