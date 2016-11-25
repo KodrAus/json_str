@@ -6,7 +6,7 @@ use rustc_plugin::Registry;
 
 use syntax::codemap::Span;
 use syntax::ptr::P;
-use syntax::parse::token;
+use syntax::symbol::Symbol;
 use syntax::tokenstream::TokenTree;
 use syntax::ext::base::{ ExtCtxt, MacResult, MacEager };
 use syntax::ext::build::AstBuilder;
@@ -24,7 +24,7 @@ fn tts_to_json(args: &[TokenTree]) -> String {
 pub fn expand_json_lit(cx: &mut ExtCtxt, sp: Span, args: &[TokenTree]) -> Box<MacResult+'static> {
 	let json = tts_to_json(args);
 
-	let str_lit = cx.expr_str(sp, token::intern_and_get_ident(&json));
+	let str_lit = cx.expr_str(sp, Symbol::intern(&json));
 	MacEager::expr(P(quote_expr!(cx, $str_lit).unwrap()))
 }
 
@@ -32,7 +32,7 @@ pub fn expand_json_lit(cx: &mut ExtCtxt, sp: Span, args: &[TokenTree]) -> Box<Ma
 pub fn expand_json_string(cx: &mut ExtCtxt, sp: Span, args: &[TokenTree]) -> Box<MacResult+'static> {
 	let json = tts_to_json(args);
 
-	let str_lit = cx.expr_str(sp, token::intern_and_get_ident(&json));
+	let str_lit = cx.expr_str(sp, Symbol::intern(&json));
 	MacEager::expr(P(quote_expr!(cx, String::from($str_lit)).unwrap()))
 }
 
