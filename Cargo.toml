@@ -9,7 +9,7 @@ repository = "https://github.com/KodrAus/json_str"
 
 [lib]
 name = "json_str"
-crate_type = [ "lib" ]
+crate_type = [ "rlib", "dylib" ]
 plugin = true
 
 [features]
