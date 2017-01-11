@@ -51,10 +51,7 @@
 //!
 //! The `json_str!` macro will take an inline token tree and return a sanitised json `String`:
 //!
-//! ```
-//! # #![feature(plugin)]
-//! # #![plugin(json_str)]
-//! # fn main() {
+//! ```ignore
 //! let json = json_str!({
 //! 	"query": {
 //! 		"filtered": {
@@ -73,15 +70,11 @@
 //! 		}
 //! 	}
 //! });
-//! # }
 //! ```
 //!
 //! This will also work for unquoted keys for something a bit more `rusty`:
 //!
-//! ```
-//! # #![feature(plugin)]
-//! # #![plugin(json_str)]
-//! # fn main() {
+//! ```ignore
 //! let json = json_str!({
 //! 	query: {
 //! 		filtered: {
@@ -100,17 +93,13 @@
 //! 		}
 //! 	}
 //! });
-//! # }
 //! ```
 //!
 //! On `nightly`, there's an additional plugin called `json_lit` that returns a `&'static str`
 //! instead of a `String`, so you can avoid allocating each time. The syntax is otherwise the same
 //! as `json_str`:
 //!
-//! ```
-//! # #![feature(plugin)]
-//! # #![plugin(json_str)]
-//! # fn main() {
+//! ```ignore
 //! let json = json_lit!({
 //! 	"query": {
 //! 		"filtered": {
@@ -129,7 +118,6 @@
 //! 		}
 //! 	}
 //! });
-//! # }
 //! ```
 //!
 //! For json values that can't be fully determined at compile-time,
