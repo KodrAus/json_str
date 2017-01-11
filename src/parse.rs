@@ -1,44 +1,29 @@
 use std::str;
 
 //TODO: Should take json state. Don't check for special values if parsing key
-pub fn sanitise(remainder: &[u8], current: &mut String) {
-	//Parse to a change of state, sending in the remainder and current
+pub fn sanitise(remainder: &[u8], sanitised: &mut String) {
 	if remainder.len() == 0 {
 		return;
 	}
 
-	match remainder[0] {
+	let current = remainder[0];
+
+	match current {
 		//Key
 		b'"'|b'\'' => {
-			let quote_byte = remainder[0];
-			let (rest, key) = take_while(&remainder[1..], |c| c != quote_byte);
+			let (rest, key) = take_while(&remainder[1..], |c| c != current);
 
-			current.push('"');
-			current.push_str(key);
-			current.push('"');
+			sanitised.push('"');
+			sanitised.push_str(key);
+			sanitised.push('"');
 
-			// TODO: Make this work for empty strings
-			sanitise(&rest[1..], current)
+			sanitise(&rest[1..], sanitised)
 		},
 		//Start of item
 		b'{'|b'['|b':' => {
-			let (rest, c) = take_first(remainder, |_| true);
-			current.push(c as char);
+			sanitised.push(current as char);
 
-			sanitise(&rest[1..], current)
-		},
-		//Replacements
-		b'$' => {
-			let (rest, key) = take_while1(&remainder[1..], |c|
-				(c as char).is_alphanumeric() ||
-				c == b'_' ||
-				c == b'.'
-			);
-
-			current.push('$');
-			current.push_str(key);
-
-			sanitise(&rest[1..], current)
+			sanitise(&remainder[1..], sanitised)
 		},
 		//Unquoted strings
 		b if (b as char).is_alphabetic() => {
@@ -52,26 +37,25 @@ pub fn sanitise(remainder: &[u8], current: &mut String) {
 			//For special values, push them as straight unquoted values. Otherwise, quote them
 			match key {
 				"true"|"false"|"null" =>
-					current.push_str(key),
+					sanitised.push_str(key),
 				_ => {
-					current.push('"');
-					current.push_str(key);
-					current.push('"');
+					sanitised.push('"');
+					sanitised.push_str(key);
+					sanitised.push('"');
 				}
 			}
 
-			sanitise(rest, current)
+			sanitise(rest, sanitised)
 		},
 		//Trim whitespace
 		b' '|b'\r'|b'\n'|b'\t' => {
-			sanitise(&remainder[1..], current)
+			sanitise(&remainder[1..], sanitised)
 		},
 		//Other chars
 		_ => {
-			let (rest, c) = take_first(remainder, |_| true);
-			current.push(c as char);
+			sanitised.push(current as char);
 
-			sanitise(&rest[1..], current)
+			sanitise(&remainder[1..], sanitised)
 		}
 	}
 }
@@ -102,7 +86,7 @@ pub fn take_while<F>(i: &[u8], f: F) -> (&[u8], &str) where F: Fn(u8) -> bool {
 		}
 	}
 
-	(&i[ctr..], str::from_utf8(&i[0..ctr]).unwrap())
+	(&i[ctr..], unsafe { str::from_utf8_unchecked(&i[0..ctr]) })
 }
 
 pub fn take_while1<F>(i: &[u8], f: F) -> (&[u8], &str) where F: Fn(u8) -> bool {
@@ -117,29 +101,5 @@ pub fn take_while1<F>(i: &[u8], f: F) -> (&[u8], &str) where F: Fn(u8) -> bool {
 		}
 	}
 
-	(&i[ctr..], str::from_utf8(&i[0..ctr]).unwrap())
-}
-
-pub fn take_first<F>(i: &[u8], f: F) -> (&[u8], u8) where F: Fn(u8) -> bool {
-	let size = i.len();
-
-	let mut ctr = 0;
-
-	for c in i {
-		if f(*c) || ctr == size - 1 {
-			break;
-		}
-		else {
-			ctr += 1;
-		}
-	}
-
-	(&i[ctr..], i[ctr])
-}
-
-pub fn shift(i: &[u8], c: usize) -> &[u8] {
-	match c {
-		c if c >= i.len() => &[],
-		_ => &i[c..]
-	}
+	(&i[ctr..], unsafe { str::from_utf8_unchecked(&i[0..ctr]) })
 }

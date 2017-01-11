@@ -47,12 +47,12 @@ fn sanitisation_removes_whitespace() {
 
 #[test]
 fn sanitisation_does_not_affect_strings() {
-	let j = "\n{ \"a\" : \"stuff and data.\n 	More.\"}";
+	let j = "\n{ \"a\" : \"stuff and data.\n 	More.\", \"b\":\"色は匂へど 散りぬるを\"}";
 
 	let mut sanitised = String::new();
 	sanitise(j.as_bytes(), &mut sanitised);
 
-	assert_eq!("{\"a\":\"stuff and data.\n 	More.\"}", &sanitised);
+	assert_eq!("{\"a\":\"stuff and data.\n 	More.\",\"b\":\"色は匂へど 散りぬるを\"}", &sanitised);
 }
 
 #[test]
