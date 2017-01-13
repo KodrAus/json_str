@@ -56,6 +56,16 @@ fn sanitisation_does_not_affect_strings() {
 }
 
 #[test]
+fn sanitisation_recognises_escaped_strings() {
+	let j = r#"{"a":"a \"quoted'\" string'. \"\\"}"#;
+
+	let mut sanitised = String::new();
+	sanitise(j.as_bytes(), &mut sanitised);
+
+	assert_eq!(r#"{"a":"a \"quoted'\" string'. \"\\"}"#, &sanitised);
+}
+
+#[test]
 fn sanitisation_standardises_quotes() {
 	let j = "{ 'a' : \"stuff\", \"b\":{  \"c\":[ '0', 1 ] },\"d\":14 }";
 
