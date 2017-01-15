@@ -159,15 +159,25 @@ macro_rules! json_fn {
 		};
 
 		let json_raw = stringify!($j);
-		let mut parsed = Vec::new();
+
+		let mut fragments = Vec::new();
+		let mut result = String::new();
 		
-		$crate::parse::parse_fragments(json_raw.as_bytes(), &mut parsed);
+		$crate::parse::parse_fragments(json_raw.as_bytes(), &mut fragments);
 
-		let fragments = $crate::parse::JsonFragments {
-			repls: repls,
-			fragments: parsed
-		};
+        for f in fragments {
+            match f {
+                $crate::parse::JsonFragment::Literal(ref l) => result.push_str(l),
+                $crate::parse::JsonFragment::Repl(ref r) => {
+                    let val = repls
+                        .get(r)
+                        .expect(&format!("replacement '{}' is not in the list of fn args", r));
 
-		fragments.to_string()
+                    result.push_str(val);
+                }
+            }
+        }
+
+        result
 	})
 }

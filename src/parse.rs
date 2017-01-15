@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::str;
 
 /// A fragment of json.
@@ -6,34 +5,6 @@ use std::str;
 pub enum JsonFragment<'a> {
     Literal(String),
     Repl(&'a str)
-}
-
-/// A collection of json fragments and replacement values.
-/// 
-/// This type implements `ToString`, which will produce a sanitised
-/// json string with replacements substituted.
-#[derive(Debug)]
-pub struct JsonFragments<'a> {
-    pub repls: BTreeMap<&'static str, &'a str>,
-    pub fragments: Vec<JsonFragment<'a>>
-}
-
-impl<'a> ToString for JsonFragments<'a> {
-    fn to_string(&self) -> String {
-        let mut result = String::new();
-
-        for f in &self.fragments {
-            match *f {
-                JsonFragment::Literal(ref l) => result.push_str(l),
-                JsonFragment::Repl(ref r) => {
-                    let val = self.repls.get(r).unwrap();
-                    result.push_str(val);
-                }
-            }
-        }
-
-        result
-    }
 }
 
 /// Parse and sanitise the complete sequence as a literal.
