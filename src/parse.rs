@@ -31,7 +31,13 @@ impl<'a> ToString for JsonFragments<'a> {
     }
 }
 
-pub fn parse<'a>(remainder: &'a [u8], fragments: &mut Vec<JsonFragment<'a>>) {
+pub fn parse_literal(remainder: &[u8], mut json: String) -> String {
+    let (_, json) = literal(remainder, json, false);
+
+    json
+}
+
+pub fn parse_fragments<'a>(remainder: &'a [u8], mut fragments: Vec<JsonFragment<'a>>) -> Vec<JsonFragment<'a>> {
     // Parse a literal
     let (remainder, l) = literal(remainder, String::new(), true);
     if l.len() > 0 {
@@ -46,17 +52,18 @@ pub fn parse<'a>(remainder: &'a [u8], fragments: &mut Vec<JsonFragment<'a>>) {
 
     // If there's anything left, run again
     if remainder.len() > 0 {
-        parse(remainder, fragments);
+        parse_fragments(remainder, fragments)
+    }
+    else {
+        fragments
     }
 }
 
-// Parse a replacement ident
-pub fn repl(remainder: &[u8]) -> (&[u8], &str) {
+// Parse a replacement ident.
+fn repl(remainder: &[u8]) -> (&[u8], &str) {
     if remainder.len() == 0 {
         return (&[], "");
     }
-
-    // TODO: Check for space after '$'
 
     take_while(&remainder, (), |_, c| {
         let more = is_ident(c as char);
@@ -65,9 +72,8 @@ pub fn repl(remainder: &[u8]) -> (&[u8], &str) {
     })
 }
 
-// Parse and sanitise a json literal.
-// This may optionally break on a replacement token.
-pub fn literal(remainder: &[u8], mut sanitised: String, break_on_repl: bool) -> (&[u8], String) {
+// Parse a literal and maybe break on a replacement token.
+fn literal(remainder: &[u8], mut sanitised: String, break_on_repl: bool) -> (&[u8], String) {
     if remainder.len() == 0 {
         return (&[], sanitised);
     }
@@ -164,7 +170,7 @@ fn is_ident(c: char) -> bool {
     c.is_alphabetic() || c == '_'
 }
 
-pub fn shift_while<F>(i: &[u8], f: F) -> &[u8]
+fn shift_while<F>(i: &[u8], f: F) -> &[u8]
     where F: Fn(u8) -> bool 
 {
     let mut ctr = 0;
@@ -181,7 +187,7 @@ pub fn shift_while<F>(i: &[u8], f: F) -> &[u8]
     &i[ctr..]
 }
 
-pub fn take_while<F, S>(i: &[u8], mut s: S, f: F) -> (&[u8], &str) 
+fn take_while<F, S>(i: &[u8], mut s: S, f: F) -> (&[u8], &str) 
     where F: Fn(S, u8) -> (S, bool) 
 {
     let mut ctr = 0;

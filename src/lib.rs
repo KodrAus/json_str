@@ -138,10 +138,9 @@ include!("lib.rs.in");
 macro_rules! json_str {
 	($j:tt) => ({
 		let json_raw = stringify!($j);
-		let mut json = String::with_capacity(json_raw.len());
-		let (_, json) = $crate::parse::literal(json_raw.as_bytes(), json, false);
+		let json = String::with_capacity(json_raw.len());
 
-		json
+		$crate::parse::parse_literal(json_raw.as_bytes(), json)
 	})
 }
 
@@ -158,12 +157,11 @@ macro_rules! json_fn {
 		};
 
 		let json_raw = stringify!($j);
-		let mut fragments = Vec::new();
-		$crate::parse::parse(json_raw.as_bytes(), &mut fragments);
+		let parsed = $crate::parse::parse_fragments(json_raw.as_bytes(), Vec::new());
 
 		let fragments = $crate::parse::JsonFragments {
 			repls: repls,
-			fragments: fragments
+			fragments: parsed
 		};
 
 		fragments.to_string()
