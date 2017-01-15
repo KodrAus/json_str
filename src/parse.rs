@@ -99,9 +99,9 @@ fn literal<'a>(remainder: &'a [u8], sanitised: &mut String, break_on_repl: bool)
         b' '|b'\r'|b'\n'|b'\t' => {
             literal(&remainder[1..], sanitised, break_on_repl)
         },
-        //Unquoted strings
+        //Unquoted key
         b if (b as char).is_alphabetic() => {
-            let (rest, key) = take_while(&remainder, (), |_, c| {
+            let (rest, key) = take_while(remainder, (), |_, c| {
                 ((), is_ident(c as char))
             });
 
@@ -116,6 +116,23 @@ fn literal<'a>(remainder: &'a [u8], sanitised: &mut String, break_on_repl: bool)
                     sanitised.push('"');
                 }
             }
+
+            literal(rest, sanitised, break_on_repl)
+        },
+        //Number
+        b if (b as char).is_numeric() => {
+            let (rest, key) = take_while(remainder, (), |_, c| {
+                ((), {
+                   (c as char).is_numeric() || 
+                    c == b'.' || 
+                    c == b'+' || 
+                    c == b'-' || 
+                    c == b'e' || 
+                    c == b'E'
+                })
+            });
+
+            sanitised.push_str(key);
 
             literal(rest, sanitised, break_on_repl)
         },
@@ -173,5 +190,5 @@ fn take_while<F, S>(i: &[u8], mut s: S, f: F) -> (&[u8], &str)
         }
     }
 
-    (&i[ctr..], unsafe { str::from_utf8_unchecked(&i[0..ctr]) })
+    (&i[ctr..], unsafe { str::from_utf8_unchecked(&i[..ctr]) })
 }

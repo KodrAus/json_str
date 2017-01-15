@@ -104,12 +104,12 @@ fn sanitisation_quotes_unquoted_keys() {
 
 #[test]
 fn sanitisation_does_not_quote_special_values() {
-	let j = "{ \"a\": \"stuff\", \"b\": true, \"c\": false, \"d\": null }";
+	let j = "{ \"a\": \"stuff\", \"b\": true, \"c\": false, \"d\": null, \"e\": 3.14e+11 }";
 
 	let mut sanitised = String::new();
 	parse_literal(j.as_bytes(), &mut sanitised);
 
-	assert_eq!("{\"a\":\"stuff\",\"b\":true,\"c\":false,\"d\":null}", &sanitised);
+	assert_eq!("{\"a\":\"stuff\",\"b\":true,\"c\":false,\"d\":null,\"e\":3.14e+11}", &sanitised);
 }
 
 #[test]
