@@ -19,14 +19,14 @@ let json = json_str!({
 ### Use `json_fn` for sanitised json that supports variable substitutions:
 
 ```rust
-let qryfn = json_fn!(|qry| {
+let get_json = json_fn!(|qry| {
     query: {
         query_string: {
             query: $qry
     }
 });
 
-let json = qryfn("\"some value\"");
+let json = get_json("\"some value\"");
 ```
 
 ### Details
