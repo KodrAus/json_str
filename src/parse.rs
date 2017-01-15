@@ -69,9 +69,7 @@ fn repl(remainder: &[u8]) -> (&[u8], &str) {
     }
 
     take_while(&remainder, (), |_, c| {
-        let more = is_ident(c as char);
-
-        ((), more)
+        ((), is_ident(c as char))
     })
 }
 
@@ -133,9 +131,7 @@ fn literal<'a>(remainder: &'a [u8], sanitised: &mut String, break_on_repl: bool)
         //Unquoted strings
         b if (b as char).is_alphabetic() => {
             let (rest, key) = take_while(&remainder, (), |_, c| {
-                let more = is_ident(c as char);
-
-                ((), more)
+                ((), is_ident(c as char))
             });
 
             //Check if the string is a special value; true, false or null

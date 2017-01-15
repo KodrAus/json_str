@@ -2,6 +2,7 @@ extern crate syntax;
 extern crate rustc;
 extern crate rustc_plugin;
 
+use std::collections::BTreeMap;
 use rustc_plugin::Registry;
 
 use syntax::codemap::Span;
@@ -12,6 +13,7 @@ use syntax::symbol::Symbol;
 use syntax::tokenstream::TokenTree;
 use syntax::ext::base::{ ExtCtxt, MacResult, MacEager, DummyResult };
 use syntax::ext::build::AstBuilder;
+use syntax::ast::*;
 use ::parse::*;
 
 fn tts_to_json(tts: &[TokenTree]) -> String {
@@ -51,7 +53,8 @@ pub fn expand_json_fn(cx: &mut ExtCtxt, sp: Span, tts: &[TokenTree]) -> Box<MacR
 		return DummyResult::any(sp);
 	}
 
-	let mut repl_args = Vec::new();
+	let mut ordered_args = Vec::new();
+	let mut repl_args = BTreeMap::<String, Ident>::new();
 	let mut more_args = true;
 
 	while more_args {
@@ -64,7 +67,7 @@ pub fn expand_json_fn(cx: &mut ExtCtxt, sp: Span, tts: &[TokenTree]) -> Box<MacR
 		}
 		else {
 			// Parse a function argument
-			let res = match parser.parse_fn_block_arg() {
+			let arg = match parser.parse_fn_block_arg() {
 				Ok(arg) => arg,
 				Err(mut e) => {
 					e.emit();
@@ -72,7 +75,19 @@ pub fn expand_json_fn(cx: &mut ExtCtxt, sp: Span, tts: &[TokenTree]) -> Box<MacR
 				}
 			};
 
-			repl_args.push(res);
+			match arg.pat.node {
+				PatKind::Ident(_, ident, _) => {
+					let key = ident.node.name.as_str().to_string();
+					let ident = ident.node;
+
+					repl_args.insert(key, ident);
+					ordered_args.push(ident);
+				},
+				_ => {
+					cx.span_err(sp, "expected ident");
+					return DummyResult::any(sp);
+				}
+			}
 		}
 	}
 
@@ -90,13 +105,47 @@ pub fn expand_json_fn(cx: &mut ExtCtxt, sp: Span, tts: &[TokenTree]) -> Box<MacR
 
 	parse_fragments(json_raw.as_bytes(), &mut fragments);
 
-	println!("{:?}", fragments);
+	let result_ident = cx.ident_of("result");
 
-	// TODO: emit expr for each fragment:
-	// - Literal: result.push_str($lit) where $lit is a Lit::Str
-	// - Repl: result.push_str($repl) where $repl is an ident
+	let mut stmts = Vec::new();
 
-	unimplemented!();
+	let let_stmt = quote_stmt!(cx, let mut $result_ident = String::new();).unwrap();
+	let ret_stmt = quote_stmt!(cx, $result_ident).unwrap();
+
+	stmts.push(let_stmt);
+
+	for fragment in fragments {
+		match fragment {
+			JsonFragment::Literal(json) => {
+				let str_lit = cx.expr_str(sp, Symbol::intern(&json));
+				let push_stmt = quote_stmt!(cx, $result_ident.push_str($str_lit);).unwrap();
+
+				stmts.push(push_stmt);
+			},
+			JsonFragment::Repl(repl) => {
+				let ident = match repl_args.get(repl) {
+					Some(ident) => ident,
+					_ => {
+						cx.span_err(sp, &format!("replacement '{}' is not in the list of fn args", repl));
+						return DummyResult::any(sp);
+					}
+				};
+
+				let push_stmt = quote_stmt!(cx, $result_ident.push_str($ident);).unwrap();
+
+				stmts.push(push_stmt);
+			}
+		}
+	}
+
+	stmts.push(ret_stmt);
+
+	let block = cx.block(sp, stmts);
+	let block_expr = P(quote_expr!(cx, $block).unwrap());
+
+	let lambda_expr = cx.lambda(sp, ordered_args, block_expr);
+
+	MacEager::expr(lambda_expr)
 }
 
 #[doc(hidden)]
