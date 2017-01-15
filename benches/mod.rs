@@ -235,3 +235,29 @@ fn parse_plain_json_string_lrg(b: &mut Bencher) {
 		})
 	});
 }
+
+#[bench]
+fn parse_repl_json_string_sml(b: &mut Bencher) {
+	let f = json_fn!(|dst, lat, lon| {
+		query: {
+			filtered: {
+				query: {
+					match_all: {}
+				},
+				filter: {
+					geo_distance: {
+						distance: $dst,
+						location: {
+							lat: $lat,
+							lon: $lon
+						}
+					}
+				}
+			}
+		}
+	});
+
+	b.iter(|| {
+		f("\"20km\"", "37.776", "-122.41");
+	});
+}

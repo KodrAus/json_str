@@ -38,17 +38,18 @@ fn can_generate_quasi_json() {
 #[test]
 fn can_generate_replacement_json() {
 	let f = json_fn!(|qry, fields| {
-		query: {
-			query_string: {
-				query: $qry,
-				fields: $fields
-			}
+		a: {
+			b: {
+				c: $ qry,
+				d: $fields
+			},
+			e: $qry
 		}
 	});
 
 	let j = f("\"*\"", "[1, 2, 3]");
 
-	assert_eq!("{\"query\":{\"query_string\":{\"query\":\"*\",\"fields\":[1, 2, 3]}}}", j);
+	assert_eq!("{\"a\":{\"b\":{\"c\":\"*\",\"d\":[1, 2, 3]},\"e\":\"*\"}}", j);
 }
 
 #[test]

@@ -1,15 +1,13 @@
 use std::collections::BTreeMap;
 use std::str;
 
-// TODO: sanitise_literal parse until '$' -> JsonToken::Literal(value)
-// TODO: sanitise_repl parse ident after '$' -> JsonToken::Repl(value)
-// TODO: if calling json_str, don't recognise '$'
-
+#[derive(Debug)]
 pub enum JsonFragment<'a> {
     Literal(String),
     Repl(&'a str)
 }
 
+#[derive(Debug)]
 pub struct JsonFragments<'a> {
     pub repls: BTreeMap<&'static str, &'a str>,
     pub fragments: Vec<JsonFragment<'a>>
@@ -34,34 +32,41 @@ impl<'a> ToString for JsonFragments<'a> {
 }
 
 pub fn parse<'a>(remainder: &'a [u8], fragments: &mut Vec<JsonFragment<'a>>) {
+    // Parse a literal
     let (remainder, l) = literal(remainder, String::new(), true);
     if l.len() > 0 {
         fragments.push(JsonFragment::Literal(l));
     }
 
+    // Parse a repl
     let (remainder, r) = repl(remainder);
     if r.len() > 0 {
         fragments.push(JsonFragment::Repl(r));
     }
 
+    // If there's anything left, run again
     if remainder.len() > 0 {
         parse(remainder, fragments);
     }
 }
 
+// Parse a replacement ident
 pub fn repl(remainder: &[u8]) -> (&[u8], &str) {
     if remainder.len() == 0 {
         return (&[], "");
     }
 
+    // TODO: Check for space after '$'
+
     take_while(&remainder, (), |_, c| {
-        let more = (c as char).is_alphabetic() ||
-                    c == b'_';
+        let more = is_ident(c as char);
 
         ((), more)
     })
 }
 
+// Parse and sanitise a json literal.
+// This may optionally break on a replacement token.
 pub fn literal(remainder: &[u8], mut sanitised: String, break_on_repl: bool) -> (&[u8], String) {
     if remainder.len() == 0 {
         return (&[], sanitised);
@@ -72,7 +77,10 @@ pub fn literal(remainder: &[u8], mut sanitised: String, break_on_repl: bool) -> 
     match current {
         //Replacement
         b'$' if break_on_repl => {
-            (&remainder[1..], sanitised)
+            //Strip trailing whitespace
+            let remainder = shift_while(&remainder[1..], |c| c == b' ');
+
+            (remainder, sanitised)
         },
         //Key
         b'"'|b'\'' => {
@@ -119,9 +127,7 @@ pub fn literal(remainder: &[u8], mut sanitised: String, break_on_repl: bool) -> 
         //Unquoted strings
         b if (b as char).is_alphabetic() => {
             let (rest, key) = take_while(&remainder, (), |_, c| {
-                let more = (c as char).is_alphabetic() ||
-                            c == b'_' ||
-                            c == b'.';
+                let more = is_ident(c as char);
 
                 ((), more)
             });
@@ -151,6 +157,28 @@ pub fn literal(remainder: &[u8], mut sanitised: String, break_on_repl: bool) -> 
             literal(&remainder[1..], sanitised, break_on_repl)
         }
     }
+}
+
+#[inline]
+fn is_ident(c: char) -> bool {
+    c.is_alphabetic() || c == '_'
+}
+
+pub fn shift_while<F>(i: &[u8], f: F) -> &[u8]
+    where F: Fn(u8) -> bool 
+{
+    let mut ctr = 0;
+
+    for c in i {
+        if f(*c) {
+            ctr += 1;
+        }
+        else {
+            break;
+        }
+    }
+
+    &i[ctr..]
 }
 
 pub fn take_while<F, S>(i: &[u8], mut s: S, f: F) -> (&[u8], &str) 

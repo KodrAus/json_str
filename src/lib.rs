@@ -161,7 +161,7 @@ macro_rules! json_fn {
 		let mut fragments = Vec::new();
 		$crate::parse::parse(json_raw.as_bytes(), &mut fragments);
 
-		let fragments = JsonFragments {
+		let fragments = $crate::parse::JsonFragments {
 			repls: repls,
 			fragments: fragments
 		};
