@@ -2,43 +2,154 @@ extern crate syntax;
 extern crate rustc;
 extern crate rustc_plugin;
 
+use std::collections::BTreeMap;
 use rustc_plugin::Registry;
-
 use syntax::codemap::Span;
 use syntax::ptr::P;
+use syntax::print::pprust::tts_to_string;
+use syntax::parse::token::{Token, BinOpToken};
 use syntax::symbol::Symbol;
 use syntax::tokenstream::TokenTree;
-use syntax::ext::base::{ ExtCtxt, MacResult, MacEager };
+use syntax::ext::base::{ ExtCtxt, MacResult, MacEager, DummyResult };
 use syntax::ext::build::AstBuilder;
+use syntax::ast::*;
+
 use ::parse::*;
 
-fn tts_to_json(args: &[TokenTree]) -> String {
-	let json_raw = syntax::print::pprust::tts_to_string(&args);
-	let mut json = String::with_capacity(json_raw.len());
-	sanitise(json_raw.as_bytes(), &mut json);
+fn tts_to_json(tts: &[TokenTree]) -> String {
+    let json_raw = tts_to_string(&tts);
+    let mut sanitised = String::with_capacity(json_raw.len());
 
-	json
+    parse_literal(json_raw.as_bytes(), &mut sanitised);
+
+    sanitised
 }
 
 //Parse a token tree to a json `str` at compile time.
-pub fn expand_json_lit(cx: &mut ExtCtxt, sp: Span, args: &[TokenTree]) -> Box<MacResult+'static> {
-	let json = tts_to_json(args);
+pub fn expand_json_lit(cx: &mut ExtCtxt, sp: Span, tts: &[TokenTree]) -> Box<MacResult+'static> {
+    let json = tts_to_json(tts);
 
-	let str_lit = cx.expr_str(sp, Symbol::intern(&json));
-	MacEager::expr(P(quote_expr!(cx, $str_lit).unwrap()))
+    let str_lit = cx.expr_str(sp, Symbol::intern(&json));
+    MacEager::expr(P(quote_expr!(cx, $str_lit).unwrap()))
 }
 
 //Parse a token tree to a json `String` at compile time.
-pub fn expand_json_string(cx: &mut ExtCtxt, sp: Span, args: &[TokenTree]) -> Box<MacResult+'static> {
-	let json = tts_to_json(args);
+pub fn expand_json_string(cx: &mut ExtCtxt, sp: Span, tts: &[TokenTree]) -> Box<MacResult+'static> {
+    let json = tts_to_json(tts);
 
-	let str_lit = cx.expr_str(sp, Symbol::intern(&json));
-	MacEager::expr(P(quote_expr!(cx, String::from($str_lit)).unwrap()))
+    let str_lit = cx.expr_str(sp, Symbol::intern(&json));
+    MacEager::expr(P(quote_expr!(cx, String::from($str_lit)).unwrap()))
+}
+
+//Parse a token tree to a closure at compile time.
+//We can't just parse to a Rust closure because the syntax isn't valid.
+//The `|arg1, arg2|` needs to be parsed independently of the rest.
+pub fn expand_json_fn(cx: &mut ExtCtxt, sp: Span, tts: &[TokenTree]) -> Box<MacResult+'static> {
+    let mut parser = cx.new_parser_from_tts(tts);
+
+    // Expect an opening '|'
+    if !parser.eat(&Token::BinOp(BinOpToken::Or)) {
+        cx.span_err(sp, &format!("expected single '|', found '{}'", parser.this_token_to_string()));
+        return DummyResult::any(sp);
+    }
+
+    let mut ordered_args = Vec::new();
+    let mut repl_args = BTreeMap::<String, Ident>::new();
+
+    loop {
+        // If we encounter a '|' then stop parsing args
+        if parser.eat(&Token::BinOp(BinOpToken::Or)) {
+            break;
+        }
+        // Otherwise parse a function argument
+        else {
+            let arg = match parser.parse_fn_block_arg() {
+                Ok(arg) => arg,
+                Err(mut e) => {
+                    e.emit();
+                    return DummyResult::any(sp);
+                }
+            };
+
+            match arg.pat.node {
+                PatKind::Ident(_, ident, _) => {
+                    let key = ident.node.name.as_str().to_string();
+                    let ident = ident.node;
+
+                    repl_args.insert(key, ident);
+                    ordered_args.push(ident);
+                },
+                _ => {
+                    cx.span_err(sp, "expected ident");
+                    return DummyResult::any(sp);
+                }
+            }
+        }
+
+        // Eat any commas
+        parser.eat(&Token::Comma);
+    }
+
+    // Treat the rest of the token stream as json
+    let json_tts = match parser.parse_all_token_trees() {
+        Ok(tts) => tts,
+        Err(mut e) => {
+            e.emit();
+            return DummyResult::any(sp);
+        }
+    };
+
+    // Parse the token tree to json fragments
+    let json_raw = tts_to_string(&json_tts);
+    let mut fragments = Vec::new();
+
+    parse_fragments(json_raw.as_bytes(), &mut fragments);
+
+    let mut stmts = Vec::new();
+
+    let result_ident = cx.ident_of("result");
+    let let_stmt = quote_stmt!(cx, let mut $result_ident = String::new();).unwrap();
+    let ret_stmt = quote_stmt!(cx, $result_ident).unwrap();
+
+    stmts.push(let_stmt);
+
+    // Create an expression to push each fragment
+    for fragment in fragments {
+        match fragment {
+            JsonFragment::Literal(json) => {
+                let str_lit = cx.expr_str(sp, Symbol::intern(&json));
+                let push_stmt = quote_stmt!(cx, $result_ident.push_str($str_lit);).unwrap();
+
+                stmts.push(push_stmt);
+            },
+            JsonFragment::Repl(repl) => {
+                let ident = match repl_args.get(repl) {
+                    Some(ident) => ident,
+                    _ => {
+                        cx.span_err(sp, &format!("replacement '{}' is not in the list of fn args", repl));
+                        return DummyResult::any(sp);
+                    }
+                };
+
+                let push_stmt = quote_stmt!(cx, $result_ident.push_str($ident);).unwrap();
+
+                stmts.push(push_stmt);
+            }
+        }
+    }
+
+    stmts.push(ret_stmt);
+
+    let block = cx.block(sp, stmts);
+    let lambda_expr = cx.lambda(sp, ordered_args, P(quote_expr!(cx, $block).unwrap()));
+
+    MacEager::expr(lambda_expr)
 }
 
 #[doc(hidden)]
 #[plugin_registrar]
 pub fn plugin_registrar(reg: &mut Registry) {
-	reg.register_macro("json_lit", expand_json_lit);
-	reg.register_macro("json_str", expand_json_string);
+    reg.register_macro("json_lit", expand_json_lit);
+    reg.register_macro("json_str", expand_json_string);
+    reg.register_macro("json_fn", expand_json_fn);
 }

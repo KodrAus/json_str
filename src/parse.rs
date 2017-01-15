@@ -1,9 +1,53 @@
 use std::str;
 
-//TODO: Should take json state. Don't check for special values if parsing key
-pub fn sanitise(remainder: &[u8], sanitised: &mut String) {
+/// A fragment of json.
+#[derive(Debug)]
+pub enum JsonFragment<'a> {
+    Literal(String),
+    Repl(&'a str)
+}
+
+/// Parse and sanitise the complete sequence as a literal.
+pub fn parse_literal(remainder: &[u8], json: &mut String) {
+    let _ = literal(remainder, json, false);
+}
+
+/// Parse and sanitise the complete sequence as literals and replacements.
+pub fn parse_fragments<'a>(remainder: &'a [u8], fragments: &mut Vec<JsonFragment<'a>>) {
+    // Parse a literal
+    let mut l = String::new();
+    let remainder = literal(remainder, &mut l, true);
+    if l.len() > 0 {
+        fragments.push(JsonFragment::Literal(l));
+    }
+
+    // Parse a repl
+    let (remainder, r) = repl(remainder);
+    if r.len() > 0 {
+        fragments.push(JsonFragment::Repl(r));
+    }
+
+    // If there's anything left, run again
+    if remainder.len() > 0 {
+        parse_fragments(remainder, fragments);
+    }
+}
+
+// Parse a replacement ident.
+fn repl(remainder: &[u8]) -> (&[u8], &str) {
     if remainder.len() == 0 {
-        return;
+        return (&[], "");
+    }
+
+    take_while(&remainder, (), |_, c| {
+        ((), is_ident(c as char))
+    })
+}
+
+// Parse a literal and maybe break on a replacement token.
+fn literal<'a>(remainder: &'a [u8], sanitised: &mut String, break_on_repl: bool) -> &'a [u8] {
+    if remainder.len() == 0 {
+        return &[];
     }
 
     let current = remainder[0];
@@ -43,22 +87,22 @@ pub fn sanitise(remainder: &[u8], sanitised: &mut String) {
             sanitised.push_str(key);
             sanitised.push('"');
 
-            sanitise(&rest[1..], sanitised)
+            literal(&rest[1..], sanitised, break_on_repl)
         },
         //Start of item
         b'{'|b'['|b':' => {
             sanitised.push(current as char);
 
-            sanitise(&remainder[1..], sanitised)
+            literal(&remainder[1..], sanitised, break_on_repl)
         },
-        //Unquoted strings
+        //Trim whitespace
+        b' '|b'\r'|b'\n'|b'\t' => {
+            literal(&remainder[1..], sanitised, break_on_repl)
+        },
+        //Unquoted key
         b if (b as char).is_alphabetic() => {
-            let (rest, key) = take_while(&remainder, (), |_, c| {
-                let more = (c as char).is_alphabetic() ||
-                            c == b'_' ||
-                            c == b'.';
-
-                ((), more)
+            let (rest, key) = take_while(remainder, (), |_, c| {
+                ((), is_ident(c as char))
             });
 
             //Check if the string is a special value; true, false or null
@@ -73,22 +117,64 @@ pub fn sanitise(remainder: &[u8], sanitised: &mut String) {
                 }
             }
 
-            sanitise(rest, sanitised)
+            literal(rest, sanitised, break_on_repl)
         },
-        //Trim whitespace
-        b' '|b'\r'|b'\n'|b'\t' => {
-            sanitise(&remainder[1..], sanitised)
+        //Number
+        b if (b as char).is_numeric() => {
+            let (rest, key) = take_while(remainder, (), |_, c| {
+                ((), {
+                   (c as char).is_numeric() || 
+                    c == b'.' || 
+                    c == b'+' || 
+                    c == b'-' || 
+                    c == b'e' || 
+                    c == b'E'
+                })
+            });
+
+            sanitised.push_str(key);
+
+            literal(rest, sanitised, break_on_repl)
+        },
+        //Replacement
+        b'$' if break_on_repl => {
+            //Strip trailing whitespace
+            let remainder = shift_while(&remainder[1..], |c| c == b' ');
+
+            remainder
         },
         //Other chars
         _ => {
             sanitised.push(current as char);
 
-            sanitise(&remainder[1..], sanitised)
+            literal(&remainder[1..], sanitised, break_on_repl)
         }
     }
 }
 
-pub fn take_while<F, S>(i: &[u8], mut s: S, f: F) -> (&[u8], &str) 
+#[inline]
+fn is_ident(c: char) -> bool {
+    c.is_alphabetic() || c == '_'
+}
+
+fn shift_while<F>(i: &[u8], f: F) -> &[u8]
+    where F: Fn(u8) -> bool 
+{
+    let mut ctr = 0;
+
+    for c in i {
+        if f(*c) {
+            ctr += 1;
+        }
+        else {
+            break;
+        }
+    }
+
+    &i[ctr..]
+}
+
+fn take_while<F, S>(i: &[u8], mut s: S, f: F) -> (&[u8], &str) 
     where F: Fn(S, u8) -> (S, bool) 
 {
     let mut ctr = 0;
@@ -104,5 +190,5 @@ pub fn take_while<F, S>(i: &[u8], mut s: S, f: F) -> (&[u8], &str)
         }
     }
 
-    (&i[ctr..], unsafe { str::from_utf8_unchecked(&i[0..ctr]) })
+    (&i[ctr..], unsafe { str::from_utf8_unchecked(&i[..ctr]) })
 }
