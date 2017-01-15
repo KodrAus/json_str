@@ -4,7 +4,6 @@ extern crate rustc_plugin;
 
 use std::collections::BTreeMap;
 use rustc_plugin::Registry;
-
 use syntax::codemap::Span;
 use syntax::ptr::P;
 use syntax::print::pprust::tts_to_string;
@@ -14,6 +13,7 @@ use syntax::tokenstream::TokenTree;
 use syntax::ext::base::{ ExtCtxt, MacResult, MacEager, DummyResult };
 use syntax::ext::build::AstBuilder;
 use syntax::ast::*;
+
 use ::parse::*;
 
 fn tts_to_json(tts: &[TokenTree]) -> String {
@@ -49,24 +49,20 @@ pub fn expand_json_fn(cx: &mut ExtCtxt, sp: Span, tts: &[TokenTree]) -> Box<MacR
 
 	// Expect an opening '|'
 	if !parser.eat(&Token::BinOp(BinOpToken::Or)) {
-		cx.span_err(sp, &format!("expected '|', found '{}'", parser.this_token_to_string()));
+		cx.span_err(sp, &format!("expected single '|', found '{}'", parser.this_token_to_string()));
 		return DummyResult::any(sp);
 	}
 
 	let mut ordered_args = Vec::new();
 	let mut repl_args = BTreeMap::<String, Ident>::new();
-	let mut more_args = true;
 
-	while more_args {
-		// Eat any commas
-		parser.eat(&Token::Comma);
-
+	loop {
 		// If we encounter a '|' then stop parsing args
 		if parser.eat(&Token::BinOp(BinOpToken::Or)) {
-			more_args = false;
+			break;
 		}
+		// Otherwise parse a function argument
 		else {
-			// Parse a function argument
 			let arg = match parser.parse_fn_block_arg() {
 				Ok(arg) => arg,
 				Err(mut e) => {
@@ -89,6 +85,9 @@ pub fn expand_json_fn(cx: &mut ExtCtxt, sp: Span, tts: &[TokenTree]) -> Box<MacR
 				}
 			}
 		}
+
+		// Eat any commas
+		parser.eat(&Token::Comma);
 	}
 
 	// Treat the rest of the token stream as json
@@ -100,20 +99,21 @@ pub fn expand_json_fn(cx: &mut ExtCtxt, sp: Span, tts: &[TokenTree]) -> Box<MacR
 		}
 	};
 
+	// Parse the token tree to json fragments
 	let json_raw = tts_to_string(&json_tts);
 	let mut fragments = Vec::new();
 
 	parse_fragments(json_raw.as_bytes(), &mut fragments);
 
-	let result_ident = cx.ident_of("result");
-
 	let mut stmts = Vec::new();
 
+	let result_ident = cx.ident_of("result");
 	let let_stmt = quote_stmt!(cx, let mut $result_ident = String::new();).unwrap();
 	let ret_stmt = quote_stmt!(cx, $result_ident).unwrap();
 
 	stmts.push(let_stmt);
 
+	// Create an expression to push each fragment
 	for fragment in fragments {
 		match fragment {
 			JsonFragment::Literal(json) => {
@@ -141,9 +141,7 @@ pub fn expand_json_fn(cx: &mut ExtCtxt, sp: Span, tts: &[TokenTree]) -> Box<MacR
 	stmts.push(ret_stmt);
 
 	let block = cx.block(sp, stmts);
-	let block_expr = P(quote_expr!(cx, $block).unwrap());
-
-	let lambda_expr = cx.lambda(sp, ordered_args, block_expr);
+	let lambda_expr = cx.lambda(sp, ordered_args, P(quote_expr!(cx, $block).unwrap()));
 
 	MacEager::expr(lambda_expr)
 }
