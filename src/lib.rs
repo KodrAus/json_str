@@ -139,8 +139,33 @@ macro_rules! json_str {
 	($j:tt) => ({
 		let json_raw = stringify!($j);
 		let mut json = String::with_capacity(json_raw.len());
-		$crate::parse::sanitise(json_raw.as_bytes(), &mut json);
+		let (_, json) = $crate::parse::literal(json_raw.as_bytes(), json, false);
 
 		json
+	})
+}
+
+#[cfg_attr(not(feature = "nightly"), macro_export)]
+#[cfg(not(feature = "nightly"))]
+macro_rules! json_fn {
+	(|$($repl:ident),*| $j:tt) => (|$($repl),*| {
+		let repls = {
+			let mut repls = ::std::collections::BTreeMap::<&'static str, &str>::new();
+
+			$(repls.insert(stringify!($repl), $repl);)*
+
+			repls
+		};
+
+		let json_raw = stringify!($j);
+		let mut fragments = Vec::new();
+		$crate::parse::parse(json_raw.as_bytes(), &mut fragments);
+
+		let fragments = JsonFragments {
+			repls: repls,
+			fragments: fragments
+		};
+
+		fragments.to_string()
 	})
 }
