@@ -127,7 +127,7 @@
 #![cfg_attr(feature = "nightly", crate_type="dylib")]
 #![cfg_attr(feature = "nightly", feature(plugin_registrar, rustc_private, quote, plugin, stmt_expr_attributes))]
 
-#[doc(hidden)]
+/// Raw parsers for sanitising a stream of json.
 pub mod parse;
 
 #[cfg(feature = "nightly")]
@@ -138,9 +138,11 @@ include!("lib.rs.in");
 macro_rules! json_str {
 	($j:tt) => ({
 		let json_raw = stringify!($j);
-		let json = String::with_capacity(json_raw.len());
+		let mut json = String::with_capacity(json_raw.len());
 
-		$crate::parse::parse_literal(json_raw.as_bytes(), json)
+		$crate::parse::parse_literal(json_raw.as_bytes(), &mut json);
+
+		json
 	})
 }
 
@@ -157,7 +159,9 @@ macro_rules! json_fn {
 		};
 
 		let json_raw = stringify!($j);
-		let parsed = $crate::parse::parse_fragments(json_raw.as_bytes(), Vec::new());
+		let mut parsed = Vec::new();
+		
+		$crate::parse::parse_fragments(json_raw.as_bytes(), &mut parsed);
 
 		let fragments = $crate::parse::JsonFragments {
 			repls: repls,

@@ -1,12 +1,17 @@
 use std::collections::BTreeMap;
 use std::str;
 
+/// A fragment of json.
 #[derive(Debug)]
 pub enum JsonFragment<'a> {
     Literal(String),
     Repl(&'a str)
 }
 
+/// A collection of json fragments and replacement values.
+/// 
+/// This type implements `ToString`, which will produce a sanitised
+/// json string with replacements substituted.
 #[derive(Debug)]
 pub struct JsonFragments<'a> {
     pub repls: BTreeMap<&'static str, &'a str>,
@@ -31,15 +36,16 @@ impl<'a> ToString for JsonFragments<'a> {
     }
 }
 
-pub fn parse_literal(remainder: &[u8], mut json: String) -> String {
-    let (_, json) = literal(remainder, json, false);
-
-    json
+/// Parse and sanitise the complete sequence as a literal.
+pub fn parse_literal(remainder: &[u8], json: &mut String) {
+    let _ = literal(remainder, json, false);
 }
 
-pub fn parse_fragments<'a>(remainder: &'a [u8], mut fragments: Vec<JsonFragment<'a>>) -> Vec<JsonFragment<'a>> {
+/// Parse and sanitise the complete sequence as literals and replacements.
+pub fn parse_fragments<'a>(remainder: &'a [u8], fragments: &mut Vec<JsonFragment<'a>>) {
     // Parse a literal
-    let (remainder, l) = literal(remainder, String::new(), true);
+    let mut l = String::new();
+    let remainder = literal(remainder, &mut l, true);
     if l.len() > 0 {
         fragments.push(JsonFragment::Literal(l));
     }
@@ -52,10 +58,7 @@ pub fn parse_fragments<'a>(remainder: &'a [u8], mut fragments: Vec<JsonFragment<
 
     // If there's anything left, run again
     if remainder.len() > 0 {
-        parse_fragments(remainder, fragments)
-    }
-    else {
-        fragments
+        parse_fragments(remainder, fragments);
     }
 }
 
@@ -73,21 +76,14 @@ fn repl(remainder: &[u8]) -> (&[u8], &str) {
 }
 
 // Parse a literal and maybe break on a replacement token.
-fn literal(remainder: &[u8], mut sanitised: String, break_on_repl: bool) -> (&[u8], String) {
+fn literal<'a>(remainder: &'a [u8], sanitised: &mut String, break_on_repl: bool) -> &'a [u8] {
     if remainder.len() == 0 {
-        return (&[], sanitised);
+        return &[];
     }
 
     let current = remainder[0];
 
     match current {
-        //Replacement
-        b'$' if break_on_repl => {
-            //Strip trailing whitespace
-            let remainder = shift_while(&remainder[1..], |c| c == b' ');
-
-            (remainder, sanitised)
-        },
         //Key
         b'"'|b'\'' => {
             enum StringState {
@@ -130,6 +126,10 @@ fn literal(remainder: &[u8], mut sanitised: String, break_on_repl: bool) -> (&[u
 
             literal(&remainder[1..], sanitised, break_on_repl)
         },
+        //Trim whitespace
+        b' '|b'\r'|b'\n'|b'\t' => {
+            literal(&remainder[1..], sanitised, break_on_repl)
+        },
         //Unquoted strings
         b if (b as char).is_alphabetic() => {
             let (rest, key) = take_while(&remainder, (), |_, c| {
@@ -152,9 +152,12 @@ fn literal(remainder: &[u8], mut sanitised: String, break_on_repl: bool) -> (&[u
 
             literal(rest, sanitised, break_on_repl)
         },
-        //Trim whitespace
-        b' '|b'\r'|b'\n'|b'\t' => {
-            literal(&remainder[1..], sanitised, break_on_repl)
+        //Replacement
+        b'$' if break_on_repl => {
+            //Strip trailing whitespace
+            let remainder = shift_while(&remainder[1..], |c| c == b' ');
+
+            remainder
         },
         //Other chars
         _ => {

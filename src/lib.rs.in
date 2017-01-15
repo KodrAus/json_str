@@ -6,6 +6,7 @@ use rustc_plugin::Registry;
 
 use syntax::codemap::Span;
 use syntax::ptr::P;
+use syntax::print::pprust::tts_to_string;
 use syntax::parse::token::{Token, BinOpToken};
 use syntax::symbol::Symbol;
 use syntax::tokenstream::TokenTree;
@@ -14,11 +15,12 @@ use syntax::ext::build::AstBuilder;
 use ::parse::*;
 
 fn tts_to_json(tts: &[TokenTree]) -> String {
-	let json_raw = syntax::print::pprust::tts_to_string(&tts);
+	let json_raw = tts_to_string(&tts);
+	let mut sanitised = String::with_capacity(json_raw.len());
 
-	let (_, json) = literal(json_raw.as_bytes(), String::with_capacity(json_raw.len()), false);
+	parse_literal(json_raw.as_bytes(), &mut sanitised);
 
-	json
+	sanitised
 }
 
 //Parse a token tree to a json `str` at compile time.
@@ -83,13 +85,10 @@ pub fn expand_json_fn(cx: &mut ExtCtxt, sp: Span, tts: &[TokenTree]) -> Box<MacR
 		}
 	};
 
-	let json_raw = syntax::print::pprust::tts_to_string(&json_tts);
-
-	println!("{:?}", repl_args);
-	println!("{:?}", json_raw);
-
+	let json_raw = tts_to_string(&json_tts);
 	let mut fragments = Vec::new();
-	parse(json_raw.as_bytes(), &mut fragments);
+
+	parse_fragments(json_raw.as_bytes(), &mut fragments);
 
 	println!("{:?}", fragments);
 
