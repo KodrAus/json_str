@@ -49,6 +49,8 @@
 //!
 //! ## Examples
 //!
+//! ### Literals
+//! 
 //! The `json_str!` macro will take an inline token tree and return a sanitised json `String`:
 //!
 //! ```ignore
@@ -101,17 +103,17 @@
 //!
 //! ```ignore
 //! let json = json_lit!({
-//!     "query": {
-//!         "filtered": {
-//!             "query": {
-//!                 "match_all": {}
+//!     query: {
+//!         filtered: {
+//!             query: {
+//!                 match_all: {}
 //!             },
-//!             "filter": {
-//!                 "geo_distance": {
-//!                     "distance": "20km",
-//!                     "location": {
-//!                         "lat": 37.776,
-//!                         "lon": -122.41
+//!             filter: {
+//!                 geo_distance: {
+//!                     distance: "20km",
+//!                     location: {
+//!                         lat: 37.776,
+//!                         lon: -122.41
 //!                     }
 //!                 }
 //!             }
@@ -119,9 +121,40 @@
 //!     }
 //! });
 //! ```
-//!
-//! For json values that can't be fully determined at compile-time,
-//! use [json_macros](https://github.com/tomjakubowski/json_macros) instead.
+//! 
+//! ### Replacement values
+//! 
+//! The `json_fn` macro will convert a set of replacement tokens and token tree
+//! and returns a lambda function that substitutes them:
+//! 
+//! ```ignore
+//! // Declares an inline Fn(&str, &str, &str) -> String
+//! let f = json_fn!(|dst, lat, lon| {
+//!     query: {
+//!         filtered: {
+//!             query: {
+//!                 match_all: {}
+//!             },
+//!             filter: {
+//!                 geo_distance: {
+//!                     distance: $dst,
+//!                     location: {
+//!                         lat: $lat,
+//!                         lon: $lon
+//!                     }
+//!                 }
+//!             }
+//!         }
+//!     }
+//! });
+//! 
+//! // Call the lambda and return the substituted json
+//! let json = f("\"20km\"", "37.776", "-122.41");
+//! ```
+//! 
+//! All input arguments are a `&str`, and the output is a `String`.
+//! Only simple variable substitution is supported, no repeating or
+//! sanitisation of the replacement values.
 
 #![doc(html_root_url = "http://kodraus.github.io/rustdoc/json_str/")]
 #![cfg_attr(feature = "nightly", crate_type="dylib")]

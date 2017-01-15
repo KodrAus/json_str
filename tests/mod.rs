@@ -38,12 +38,12 @@ fn can_generate_quasi_json() {
 #[test]
 fn can_generate_replacement_json() {
     let f = json_fn!(|qry, fields| {
-        a: {
-            b: {
-                c: $ qry,
-                d: $fields
+        "a": {
+            "b": {
+                "c": $ qry,
+                "d": $fields
             },
-            e: $qry
+            "e": $qry
         }
     });
 
