@@ -34,3 +34,5 @@ let json = get_json("\"some value\"");
 This crate is an ergonomic way to build json strings in Rust on the `stable` and `nightly` channels. Rust has a json-like syntax for defining structures, so it's easy to convert some valid Rust token trees into json. This crate will also minify whitespace and standardise quotes while it's building the `String`. 
 
 On `stable`, conversion is provided by a simple macro. On `nightly`, conversion is provided by a compiler plugin that sanitises the input at compile time instead of runtime. The `nightly` channel also provides an alternative plugin for creating `&str` literals instead of `String`s, to avoid that allocation.
+
+> **NOTE:** `json_fn` is not intended to be used with raw user-input. Values are spliced in as-is, with no sanitisation or escaping done. The parsing (which is also not designed to be secure, it expects trusted input since it come directly from the app binary) runs before any values are substituted. Make sure you verify your inputs appropriately!
