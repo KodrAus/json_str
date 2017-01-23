@@ -5,7 +5,7 @@
 
 ## [Docs and samples](https://docs.rs/json_str/)
 
-### Use `json_str` for sanitised json literals:
+### Use `json_str` for standardised json literals:
 
 ```rust
 let json = json_str!({
@@ -16,7 +16,7 @@ let json = json_str!({
 });
 ```
 
-### Use `json_fn` for sanitised json that supports variable substitutions:
+### Use `json_fn` for standardised json that supports variable substitutions:
 
 ```rust
 let get_json = json_fn!(|qry| {
@@ -33,7 +33,7 @@ let json = get_json("\"some value\"");
 
 This crate is an ergonomic way to build json strings in Rust on the `stable` and `nightly` channels. Rust has a json-like syntax for defining structures, so it's easy to convert some valid Rust token trees into json. This crate will also minify whitespace and standardise quotes while it's building the `String`. 
 
-On `stable`, conversion is provided by a simple macro. On `nightly`, conversion is provided by a compiler plugin that sanitises the input at compile time instead of runtime. The `nightly` channel also provides an alternative plugin for creating `&str` literals instead of `String`s, to avoid that allocation.
+On `stable`, conversion is provided by a simple macro. On `nightly`, conversion is provided by a compiler plugin that sanitises the input at compile time instead of runtime. The `nightly` channel also provides an alternative plugin for creating `&str` literals instead of a `String`, to avoid that allocation.
 
 ### Don't trust user input!
 
