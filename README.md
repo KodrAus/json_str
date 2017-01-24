@@ -29,6 +29,8 @@ let get_json = json_fn!(|qry| {
 let json = get_json("\"some value\"");
 ```
 
+Also see the `json` macro from [`serde_json`](https://github.com/serde-rs/json). If you're building complex or dynamic structures, especially on `stable`, it'll be a better approach.
+
 ### Details
 
 This crate is an ergonomic way to build json strings in Rust on the `stable` and `nightly` channels. Rust has a json-like syntax for defining structures, so it's easy to convert some valid Rust token trees into json. This crate will also minify whitespace and standardise quotes while it's building the `String`. 
