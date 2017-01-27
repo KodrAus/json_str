@@ -25,6 +25,6 @@ script:
   - |
       travis-cargo test &&
       travis-cargo bench &&
-      travis-cargo --only nightly test -- --features nightly-testing --no-default-features &&
-      travis-cargo --only nightly bench -- --features nightly-testing --no-default-features &&
+      travis-cargo --only nightly test -- --features nightly --no-default-features &&
+      travis-cargo --only nightly bench -- --features nightly --no-default-features &&
       travis-cargo --only nightly doc
