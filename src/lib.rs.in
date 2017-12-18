@@ -5,7 +5,6 @@ extern crate rustc_plugin;
 use std::collections::BTreeMap;
 use rustc_plugin::Registry;
 use syntax::codemap::Span;
-use syntax::ptr::P;
 use syntax::print::pprust::tts_to_string;
 use syntax::parse::token::{Token, BinOpToken};
 use syntax::symbol::Symbol;
@@ -30,7 +29,7 @@ pub fn expand_json_lit(cx: &mut ExtCtxt, sp: Span, tts: &[TokenTree]) -> Box<Mac
     let json = tts_to_json(tts);
 
     let str_lit = cx.expr_str(sp, Symbol::intern(&json));
-    MacEager::expr(P(quote_expr!(cx, $str_lit).unwrap()))
+    MacEager::expr(quote_expr!(cx, $str_lit))
 }
 
 //Parse a token tree to a json `String` at compile time.
@@ -38,7 +37,7 @@ pub fn expand_json_string(cx: &mut ExtCtxt, sp: Span, tts: &[TokenTree]) -> Box<
     let json = tts_to_json(tts);
 
     let str_lit = cx.expr_str(sp, Symbol::intern(&json));
-    MacEager::expr(P(quote_expr!(cx, String::from($str_lit)).unwrap()))
+    MacEager::expr(quote_expr!(cx, String::from($str_lit)))
 }
 
 //Parse a token tree to a closure at compile time.
@@ -141,7 +140,7 @@ pub fn expand_json_fn(cx: &mut ExtCtxt, sp: Span, tts: &[TokenTree]) -> Box<MacR
     stmts.push(ret_stmt);
 
     let block = cx.block(sp, stmts);
-    let lambda_expr = cx.lambda(sp, ordered_args, P(quote_expr!(cx, $block).unwrap()));
+    let lambda_expr = cx.lambda(sp, ordered_args, quote_expr!(cx, $block));
 
     MacEager::expr(lambda_expr)
 }
