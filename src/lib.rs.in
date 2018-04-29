@@ -72,9 +72,8 @@ pub fn expand_json_fn(cx: &mut ExtCtxt, sp: Span, tts: &[TokenTree]) -> Box<MacR
 
             match arg.pat.node {
                 PatKind::Ident(_, ident, _) => {
-                    let key = ident.node.name.as_str().to_string();
-                    let ident = ident.node;
-
+                    let key = ident.name.as_str().to_string();
+                    
                     repl_args.insert(key, ident);
                     ordered_args.push(ident);
                 },
